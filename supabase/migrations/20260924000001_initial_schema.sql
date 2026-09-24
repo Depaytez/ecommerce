@@ -1,10 +1,12 @@
 -- ================================================================
 -- JRADIANCE E-Commerce - Baseline Migration
 -- Migration: 20260924000001_initial_schema.sql
--- Description: Core types, tables, indexes, triggers, and baseline RLS
+-- Description: Core types, tables, indexes, triggers, storage, and baseline RLS
 -- ================================================================
 
--- 1. CUSTOM ENUMS
+-- 1. EXTENSIONS & CUSTOM ENUMS
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
   CREATE TYPE public.user_role AS ENUM ('customer', 'admin', 'agent', 'chief_admin');
 END IF; END $$;
@@ -106,9 +108,13 @@ CREATE TABLE IF NOT EXISTS public.orders (
   shipping_cost decimal(10, 2) DEFAULT 0,
   total_amount decimal(10, 2) NOT NULL,
   discount_applied decimal(10, 2) DEFAULT 0,
+  currency text DEFAULT 'NGN',
+  original_amount decimal(10, 2) NULL,
+  exchange_rate decimal(10, 4) DEFAULT 1.0,
   status public.order_status DEFAULT 'pending',
   payment_status public.payment_status DEFAULT 'pending',
-  currency text DEFAULT 'NGN',
+  payment_reference text,
+  payment_verified_at timestamptz NULL,
   notes text,
   shipping_address text,
   billing_address text,
@@ -148,7 +154,7 @@ CREATE TABLE IF NOT EXISTS public.product_reviews (
 -- Admin Activity Logs
 CREATE TABLE IF NOT EXISTS public.admin_activity_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id uuid REFERENCES public.admin_staff(id),
+  admin_id uuid REFERENCES public.admin_staff(id) ON DELETE SET NULL,
   action text NOT NULL,
   resource_type text,
   resource_id uuid,
@@ -158,7 +164,7 @@ CREATE TABLE IF NOT EXISTS public.admin_activity_logs (
   created_at timestamptz DEFAULT now()
 );
 
--- Issues (Feedback / Bug Reports)
+-- Issues (Customer inquiries & bugs)
 CREATE TABLE IF NOT EXISTS public.issues (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   type text NOT NULL CHECK (type IN ('bug', 'complaint', 'feature_request')),
@@ -225,6 +231,7 @@ CREATE SEQUENCE IF NOT EXISTS public.order_number_seq START WITH 1000 INCREMENT 
 
 -- 4. ESSENTIAL FUNCTIONS & TRIGGERS
 
+-- Handle new user registration automatically
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
@@ -249,6 +256,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Update timestamp trigger function
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS trigger AS $$
 BEGIN
@@ -267,6 +275,10 @@ CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON public.products
 
 DROP TRIGGER IF EXISTS update_orders_updated_at ON public.orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON public.orders
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_admin_staff_updated_at ON public.admin_staff;
+CREATE TRIGGER update_admin_staff_updated_at BEFORE UPDATE ON public.admin_staff
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Generate Product Slug
@@ -304,14 +316,144 @@ CREATE TRIGGER generate_product_slug
   BEFORE INSERT OR UPDATE OF name ON public.products
   FOR EACH ROW EXECUTE FUNCTION public.generate_product_slug();
 
--- 5. INDEXES
+-- Log admin action helper
+CREATE OR REPLACE FUNCTION public.log_admin_action(
+  admin_id uuid,
+  action text,
+  resource_type text DEFAULT NULL,
+  resource_id uuid DEFAULT NULL,
+  changes jsonb DEFAULT NULL
+)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO public.admin_activity_logs (admin_id, action, resource_type, resource_id, changes)
+  VALUES (admin_id, action, resource_type, resource_id, changes);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Generate unique order number
+CREATE OR REPLACE FUNCTION public.generate_order_number()
+RETURNS text AS $$
+DECLARE
+  v_order_number text;
+BEGIN
+  SELECT 'ORD-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(NEXTVAL('public.order_number_seq')::text, 6, '0')
+  INTO v_order_number;
+  RETURN v_order_number;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Low stock alert query function
+CREATE OR REPLACE FUNCTION public.check_low_stock_alerts(
+  p_threshold integer DEFAULT 10
+)
+RETURNS TABLE (
+  product_id uuid,
+  product_name text,
+  current_stock integer,
+  sku text
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT p.id, p.name, p.stock_quantity, p.sku
+  FROM public.products p
+  WHERE p.stock_quantity <= p_threshold AND p.is_active = true
+  ORDER BY p.stock_quantity ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Admin notification trigger on payment
+CREATE OR REPLACE FUNCTION public.create_payment_notification()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.admin_notifications (admin_id, type, title, message, related_order_id)
+  SELECT 
+    p.id as admin_id,
+    'payment_received' as type,
+    '💰 New Paid Order!' as title,
+    'Order ' || NEW.order_number || ' worth ' || NEW.currency || ' ' || NEW.total_amount || ' has been paid' as message,
+    NEW.id as related_order_id
+  FROM public.profiles p
+  WHERE p.role IN ('admin', 'chief_admin') AND p.is_active = true;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS notify_on_payment ON public.orders;
+CREATE TRIGGER notify_on_payment
+  AFTER UPDATE ON public.orders
+  FOR EACH ROW WHEN (OLD.payment_status = 'pending' AND NEW.payment_status = 'completed')
+  EXECUTE FUNCTION public.create_payment_notification();
+
+-- 5. PERFORMANCE INDEXES
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_is_active ON public.profiles(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON public.products(slug);
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_is_active ON public.products(is_active);
+CREATE INDEX IF NOT EXISTS idx_products_price ON public.products(price);
+CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_products_deleted_at ON public.products(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_cart_items_user_id ON public.cart_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product_id ON public.cart_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_user_id ON public.wishlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_product_id ON public.wishlist(product_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON public.orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON public.order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON public.product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_user_id ON public.product_reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_notifications_admin_is_read ON public.admin_notifications(admin_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_admin_activity_logs_created_at ON public.admin_activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_issues_status ON public.issues(status);
+
+-- 6. STORAGE BUCKET INITIALIZATION & POLICIES
+INSERT INTO storage.buckets (id, name, public)
+VALUES 
+  ('product-images', 'product-images', true),
+  ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Product Images bucket policies
+DROP POLICY IF EXISTS "Public View Product Images" ON storage.objects;
+DROP POLICY IF EXISTS "Admin Manage Product Images" ON storage.objects;
+
+CREATE POLICY "Public View Product Images" ON storage.objects
+  FOR SELECT TO public
+  USING (bucket_id = 'product-images');
+
+CREATE POLICY "Admin Manage Product Images" ON storage.objects
+  FOR ALL TO authenticated
+  USING (
+    bucket_id = 'product-images' AND 
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'agent', 'chief_admin'))
+  );
+
+-- Avatars bucket policies
+DROP POLICY IF EXISTS "Public View Avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Users Manage Own Avatar" ON storage.objects;
+
+CREATE POLICY "Public View Avatars" ON storage.objects
+  FOR SELECT TO public
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "Users Manage Own Avatar" ON storage.objects
+  FOR ALL TO authenticated
+  USING (
+    bucket_id = 'avatars' AND (
+      (storage.foldername(name))[1] = auth.uid()::text OR
+      EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'chief_admin'))
+    )
+  );
+
+-- 7. BASELINE GRANTS
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;

@@ -235,7 +235,64 @@ CREATE POLICY "stock_reservations_select_admin" ON public.stock_reservations
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'agent', 'chief_admin')));
 
+-- 6. CHIEF ADMIN UPGRADE PROCEDURE
+CREATE OR REPLACE FUNCTION public.upgrade_user_to_chief_admin(p_email text)
+RETURNS jsonb AS $$
+DECLARE
+  v_user_id uuid;
+  v_staff_id text;
+BEGIN
+  SELECT id INTO v_user_id
+  FROM public.profiles
+  WHERE email = p_email;
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'User not found with email: ' || p_email);
+  END IF;
+
+  UPDATE public.profiles
+  SET role = 'chief_admin',
+      is_active = true,
+      updated_at = now()
+  WHERE id = v_user_id;
+
+  v_staff_id := 'CHIEF-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(NEXTVAL('public.order_number_seq')::text, 4, '0');
+
+  INSERT INTO public.admin_staff (
+    id,
+    profile_id,
+    staff_id,
+    department,
+    position,
+    permissions,
+    is_active,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    v_user_id,
+    v_user_id,
+    v_staff_id,
+    'Executive',
+    'Chief Administrator',
+    '{"manage_users": true, "manage_roles": true, "manage_settings": true, "view_all": true, "delete_orders": true, "manage_catalog": true}'::jsonb,
+    true,
+    now(),
+    now()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    position = 'Chief Administrator',
+    department = 'Executive',
+    permissions = '{"manage_users": true, "manage_roles": true, "manage_settings": true, "view_all": true, "delete_orders": true, "manage_catalog": true}'::jsonb,
+    is_active = true,
+    updated_at = now();
+
+  RETURN jsonb_build_object('success', true, 'user_id', v_user_id, 'email', p_email, 'role', 'chief_admin');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Grant execute permissions for functions
 GRANT EXECUTE ON FUNCTION public.reserve_stock_for_checkout TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.commit_stock_reservation TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_stock_reservation TO service_role;
+GRANT EXECUTE ON FUNCTION public.upgrade_user_to_chief_admin TO service_role;
