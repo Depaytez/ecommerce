@@ -143,7 +143,7 @@ export default function ShopPage({ searchParams }: ShopPageProps) {
 
   // Sort products
   const sortedProducts = useMemo(() => {
-    let sorted = [...products];
+    const sorted = [...products];
 
     switch (sortBy) {
       case "price-low":
