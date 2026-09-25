@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { UserRoundPen, Shield, LayoutDashboard, Globe } from "lucide-react";
+import { UserRoundPen, Shield, LayoutDashboard } from "lucide-react";
 import ProfileSettingsOverlay from "./ProfileSettingsOverlay";
 import CurrencyToggle from "./CurrencyToggle";
 import { usePathname } from "next/navigation";
@@ -17,7 +17,7 @@ export default function TopBar() {
   const isAdminRoute = pathname?.startsWith("/admin");
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFFDF5]/85 backdrop-blur-md border-b border-amber-100/50 shadow-xs">
       <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center justify-between">
         {/* Logo container */}
         <Link
