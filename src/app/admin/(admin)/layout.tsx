@@ -16,6 +16,8 @@ import AdminErrorBoundary from "@/components/admin/AdminErrorBoundary";
 import AdminLayoutContent from "./AdminLayoutContent";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { AdminProvider, type AdminUser } from "@/context/AdminContext";
+import type { UserRole } from "@/types";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -24,20 +26,52 @@ interface AdminLayoutProps {
 export default async function AdminLayout({ children }: AdminLayoutProps) {
   const supabase = await createClient();
 
-  // Minimal defensive check - middleware handles main protection
+  let user = null;
   try {
     const {
-      data: { user },
+      data: { user: authUser },
     } = await supabase.auth.getUser();
-
-    if (!user) {
-      redirect("/admin/login");
-    }
+    user = authUser;
   } catch (error) {
     redirect("/admin/login");
   }
 
+  if (!user) {
+    redirect("/admin/login");
+  }
+
+  // Fetch user role
+  let role: UserRole = "agent";
+  let fullName: string | null = null;
+
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role) {
+      if (profile.role === "customer") {
+        redirect("/admin/login?error=unauthorized");
+      }
+      role = profile.role as UserRole;
+      fullName = profile.full_name || null;
+    }
+  } catch (err) {
+    console.warn("Could not query profiles for admin layout:", err);
+  }
+
+  const adminUser: AdminUser = {
+    id: user.id,
+    email: user.email || "",
+    full_name: fullName,
+    role,
+  };
+
   return (
-    <AdminLayoutContent>{children}</AdminLayoutContent>
+    <AdminProvider admin={adminUser}>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </AdminProvider>
   );
 }

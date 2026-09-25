@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Server Actions configuration (Increased limit for product uploads)
-  serverActions: {
-    bodySizeLimit: "5mb",
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
   },
 
   // Environment variables for SEO
@@ -36,7 +38,6 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60 * 60 * 24, // 24 hours
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    // Enable modern image formats
     formats: ["image/webp", "image/avif"],
   },
 
@@ -50,21 +51,21 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value:
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.flutterwave.com https://*.supabase.co https://*.fingerprintjs.com https://*.fpcdn.io https://*.datadoghq.com https://va.vercel-scripts.com; " +
-              "style-src 'self' 'unsafe-inline' https://checkout.flutterwave.com https://fonts.googleapis.com; " +
-              "style-src-elem 'self' 'unsafe-inline' https://checkout.flutterwave.com https://fonts.googleapis.com; " +
-              "img-src 'self' data: blob: https://jradianceco.com https://www.jradianceco.com https://*.supabase.co https://*.vercel.com; " +
-              "connect-src 'self' https://*.supabase.co https://*.datadoghq.com https://api.flutterwave.com https://*.flutterwave.com https://*.vercel-analytics.com; " +
-              "frame-src 'self' https://checkout.flutterwave.com;",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.supabase.co https://*.fingerprintjs.com https://*.fpcdn.io https://*.datadoghq.com https://va.vercel-scripts.com; " +
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+              "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+              "img-src 'self' data: blob: https://jradianceco.com https://www.jradianceco.com https://*.supabase.co https://*.vercel.com https://*.stripe.com; " +
+              "connect-src 'self' https://*.supabase.co https://*.datadoghq.com https://api.stripe.com https://*.stripe.com https://*.vercel-analytics.com; " +
+              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com;",
           },
-          // Additional security headers for SEO
+          // Additional security headers
           {
             key: "X-Content-Type-Options",
             value: "nosniff",
           },
           {
             key: "X-Frame-Options",
-            value: "DENY",
+            value: "SAMEORIGIN",
           },
           {
             key: "X-XSS-Protection",

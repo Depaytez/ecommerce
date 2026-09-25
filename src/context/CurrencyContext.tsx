@@ -93,9 +93,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     toggleCurrency,
   }), [currency, setCurrency, formatPrice, getPrice, toggleCurrency]);
 
-  if (!isLoaded) {
-    return null; // Prevent flash of wrong currency
-  }
 
   return (
     <CurrencyContext.Provider value={value}>

@@ -16,6 +16,10 @@ export default function TopBar() {
   const isAdmin = useIsAdmin();
   const isAdminRoute = pathname?.startsWith("/admin");
 
+  if (isAdminRoute) {
+    return null;
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFFDF5]/85 backdrop-blur-md border-b border-amber-100/50 shadow-xs">
       <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center justify-between">

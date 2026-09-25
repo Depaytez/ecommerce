@@ -9,7 +9,8 @@
 
 import { useState, useEffect } from "react";
 import { checkPermission, getAdminPermissions } from "../admin-actions";
-import { Shield, Lock, Check, X } from "lucide-react";
+import { Shield, Lock, Check, X, AlertTriangle } from "lucide-react";
+import { useAdmin } from "@/context/AdminContext";
 
 interface PermissionMatrix {
   role: string;
@@ -22,18 +23,26 @@ interface PermissionMatrix {
 }
 
 export default function PermissionRolesPage() {
-  const [isChiefAdmin, setIsChiefAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const adminContext = useAdmin();
+  const [isChiefAdmin, setIsChiefAdmin] = useState<boolean>(() => {
+    return adminContext ? adminContext.isChiefAdmin : false;
+  });
+  const [loading, setLoading] = useState(!adminContext);
 
   useEffect(() => {
-    checkPermissions();
-    setLoading(false);
-  }, []);
+    if (adminContext) {
+      setIsChiefAdmin(adminContext.isChiefAdmin);
+      setLoading(false);
+      return;
+    }
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("chief_admin");
-    setIsChiefAdmin(hasPermission);
-  }
+    async function check() {
+      const hasPermission = await checkPermission("chief_admin");
+      setIsChiefAdmin(hasPermission);
+      setLoading(false);
+    }
+    check();
+  }, [adminContext]);
 
   const permissionMatrix: PermissionMatrix[] = [
     {
@@ -74,12 +83,25 @@ export default function PermissionRolesPage() {
     },
   ];
 
-  if (!isChiefAdmin) {
+  if (!loading && !isChiefAdmin) {
     return (
-      <div className="text-center py-12">
-        <Shield size={48} className="mx-auto text-red-400 mb-4" />
-        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600 mt-2">Only Chief Admin can access permission settings.</p>
+      <div className="text-center py-16 bg-white rounded-2xl border border-red-100 shadow-sm max-w-lg mx-auto mt-12 p-8">
+        <Shield size={48} className="mx-auto text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900">Access Restricted</h2>
+        <p className="text-gray-500 mt-2 text-sm">Only Chief Administrators can access permission settings.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-48 bg-gray-200 rounded-lg" />
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-gray-50 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }

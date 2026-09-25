@@ -16,7 +16,8 @@ import {
   clearResolvedIssues,
   checkPermission
 } from "../issue-actions";
-import { AlertTriangle, Bug, MessageSquare, CheckCircle, Clock, AlertCircle, Plus, Trash2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Bug, MessageSquare, CheckCircle, Clock, AlertCircle, Plus, Trash2, RotateCcw, Shield } from "lucide-react";
+import { useAdmin } from "@/context/AdminContext";
 
 interface Issue {
   id: string;
@@ -34,7 +35,10 @@ interface Issue {
 }
 
 export default function IssuesLogPage() {
-  const [hasAccess, setHasAccess] = useState(false);
+  const adminContext = useAdmin();
+  const [hasAccess, setHasAccess] = useState<boolean>(() => {
+    return adminContext ? adminContext.isAdmin : true;
+  });
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "bug" | "complaint" | "feature_request">("all");
@@ -45,9 +49,13 @@ export default function IssuesLogPage() {
   const [clearingResolved, setClearingResolved] = useState(false);
 
   useEffect(() => {
-    checkPermissions();
+    if (adminContext) {
+      setHasAccess(adminContext.isAdmin);
+    } else {
+      checkPermissions();
+    }
     loadIssues();
-  }, []);
+  }, [adminContext]);
 
   async function checkPermissions() {
     const hasPermission = await checkPermission("admin");
@@ -147,11 +155,32 @@ export default function IssuesLogPage() {
     }
   };
 
-  if (!hasAccess) {
+  if (!loading && hasAccess === false) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600 mt-2">You don't have permission to view issues log.</p>
+      <div className="text-center py-16 bg-white rounded-2xl border border-red-100 shadow-sm max-w-lg mx-auto mt-12 p-8">
+        <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-500">
+          <AlertTriangle size={32} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Access Restricted</h2>
+        <p className="text-gray-500 mt-2 text-sm">You don&apos;t have administrative permissions to view or manage the issues log.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded-lg mb-2" />
+            <div className="h-4 w-72 bg-gray-100 rounded-md" />
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 bg-gray-50 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }

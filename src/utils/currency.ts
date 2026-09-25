@@ -41,20 +41,25 @@ export function detectUserCurrency(): CurrencyCode {
   try {
     // Method 1: Check timezone
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (timezone === 'Africa/Lagos') {
+    if (timezone === 'Africa/Lagos' || timezone === 'Africa/Abuja' || timezone === 'Africa/Porto-Novo') {
       return 'NGN';
     }
 
-    // Method 2: Check browser language
-    const browserLanguage = navigator.language || (navigator as any).userLanguage;
-    if (browserLanguage?.toLowerCase().includes('ng') || browserLanguage?.toLowerCase().includes('ha')) {
-      return 'NGN';
+    // Method 2: Check browser languages array
+    const languages = navigator.languages || [navigator.language || (navigator as any).userLanguage || ''];
+    for (const lang of languages) {
+      const lower = lang.toLowerCase();
+      if (
+        lower.endsWith('-ng') ||
+        lower.startsWith('yo') ||
+        lower.startsWith('ha') ||
+        lower.startsWith('ig')
+      ) {
+        return 'NGN';
+      }
     }
 
-    // Method 3: Check IP-based location (if available from backend)
-    // This would require a backend call, so we'll skip for now
-
-    // Default to USD for international customers
+    // Default to USD for all international users
     return 'USD';
   } catch (error) {
     console.error('Error detecting currency:', error);
