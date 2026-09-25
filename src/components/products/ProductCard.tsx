@@ -49,7 +49,7 @@ function ProductCard({
 }: ProductCardProps) {
   const user = useUser();
   const { success, error: showError } = useToast();
-  const { refreshCart } = useCart();
+  const { addItem } = useCart();
   const {
     addToWishlist,
     removeFromWishlist,
@@ -130,53 +130,10 @@ function ProductCard({
 
       setCartLoading(true);
       try {
-        const { createClient } = await import("@/utils/supabase/client");
-        const supabase = createClient();
-
-        // Check if item already in cart
-        const { data: existingItem } = await supabase
-          .from("cart_items")
-          .select("id, quantity")
-          .eq("user_id", user.id)
-          .eq("product_id", product.id)
-          .single();
-
-        let result;
-        if (existingItem) {
-          // Update quantity
-          const { data, error } = await supabase
-            .from("cart_items")
-            .update({
-              quantity: existingItem.quantity + quantity,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", existingItem.id)
-            .select()
-            .single();
-
-          if (error) throw error;
-          result = data;
-        } else {
-          // Insert new item
-          const { data, error } = await supabase
-            .from("cart_items")
-            .insert({
-              user_id: user.id,
-              product_id: product.id,
-              quantity,
-            })
-            .select()
-            .single();
-
-          if (error) throw error;
-          result = data;
-        }
-
-        if (result) {
+        const ok = await addItem(product.id, quantity);
+        if (ok) {
           success(`Added ${quantity} x ${product.name} to cart!`);
           setQuantity(1);
-          // Refresh cart to update UI
-          await refreshCart();
         } else {
           showError("Failed to add to cart");
         }
@@ -187,7 +144,7 @@ function ProductCard({
         setCartLoading(false);
       }
     },
-    [user, product.id, product.name, quantity, success, showError, refreshCart],
+    [user, product.id, product.name, quantity, addItem, success, showError],
   );
 
   // Handle wishlist toggle
