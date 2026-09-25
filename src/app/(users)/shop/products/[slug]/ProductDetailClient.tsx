@@ -546,7 +546,7 @@ function ProductDetailContent({
                         <p className="text-xs font-bold text-gray-700">
                           Secure Payment
                         </p>
-                        <p className="text-xs text-gray-500">Flutterwave</p>
+                        <p className="text-xs text-gray-500">Stripe Secured</p>
                       </div>
                     </div>
                     <div className="flex flex-col items-center gap-2">

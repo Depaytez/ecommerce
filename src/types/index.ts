@@ -4,8 +4,6 @@ import { JSONContent } from "@tiptap/core";
  * Ensures type safety across the entire application
  */
 
-// Export Flutterwave payment types
-export * from './flutterwave';
 
 /* User & Authentication Types */
 export type UserRole = "customer" | "admin" | "agent" | "chief_admin";
