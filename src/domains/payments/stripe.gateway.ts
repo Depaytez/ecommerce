@@ -51,6 +51,7 @@ export class StripePaymentGateway implements IPaymentGateway {
       amount: paymentIntent.amount / 100,
       currency: paymentIntent.currency,
       status: paymentIntent.status,
+      provider: 'stripe',
     };
   }
 
@@ -63,6 +64,7 @@ export class StripePaymentGateway implements IPaymentGateway {
         amount: pi.amount / 100,
         currency: pi.currency,
         status: pi.status,
+        provider: 'stripe',
       };
     } catch (error) {
       console.error(`[Stripe Gateway] Failed to retrieve payment intent ${paymentIntentId}:`, error);
@@ -89,6 +91,7 @@ export class StripePaymentGateway implements IPaymentGateway {
     return {
       id: event.id,
       type: event.type,
+      provider: 'stripe',
       data: {
         object: event.data.object,
       },

@@ -21,6 +21,7 @@ import {
   Loader2,
   UserCircle,
   Menu,
+  Store,
 } from "lucide-react";
 import { adminLogout, getAdminUserInfo } from "@/app/admin/(admin-auth)/login/actions";
 import NotificationBadge from "./admin/NotificationBadge";
@@ -232,10 +233,25 @@ export default function AdminSidePanel({ isCollapsed, onToggle }: AdminSidePanel
         })}
       </nav>
 
-      {/* Footer - Logout */}
+      {/* Footer - Store link and Logout */}
       <div className={`px-3 py-4 border-t border-white/5 flex-shrink-0 transition-all duration-300 ${
         isCollapsed ? "px-2" : ""
       }`}>
+        <Link
+          href="/"
+          className={`w-full flex items-center gap-3 px-3 py-2.5 mb-1.5 rounded-lg text-amber-200/80 hover:bg-white/5 hover:text-amber-300 transition-colors ${
+            isCollapsed ? "justify-center" : ""
+          }`}
+          title="Return to Store"
+        >
+          <Store size={18} className="flex-shrink-0" />
+          <span className={`text-sm font-semibold whitespace-nowrap transition-all duration-300 ${
+            isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100"
+          }`}>
+            View Store
+          </span>
+        </Link>
+
         <button
           onClick={handleLogout}
           disabled={isLoggingOut}

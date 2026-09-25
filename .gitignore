@@ -45,8 +45,7 @@ next-env.d.ts
 /error-cache
 
 # Guide Docs
-SEO_IMPROVEMENTS.md
-SEO_STEP_BY_STEP_GUIDE.md
-SUPABASE_STORAGE_SETUP.md 
-EMAIL_TEMPLATES.md
-QUICK_START_CHECKLIST.md
+.md
+
+# supabase temp
+supabase/.temp/

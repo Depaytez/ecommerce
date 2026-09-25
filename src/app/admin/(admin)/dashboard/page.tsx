@@ -29,9 +29,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import { useAdmin } from "@/context/AdminContext";
 
 export default function DashboardPage() {
-  const [hasAccess, setHasAccess] = useState(false);
+  const adminContext = useAdmin();
+  const [hasAccess, setHasAccess] = useState<boolean>(() => {
+    return adminContext ? adminContext.canAccess("agent") : true;
+  });
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -48,11 +52,20 @@ export default function DashboardPage() {
     let aborted = false;
 
     async function loadData() {
-      const hasPermission = await checkPermission("agent");
-      if (!aborted) setHasAccess(hasPermission);
+      // If adminContext is available, role is pre-verified on server
+      let permitted = true;
+      if (adminContext) {
+        permitted = adminContext.canAccess("agent");
+      } else {
+        permitted = await checkPermission("agent");
+      }
 
-      if (hasPermission && !aborted) {
+      if (!aborted) setHasAccess(permitted);
+
+      if (permitted && !aborted) {
         await loadDashboardData(aborted);
+      } else if (!aborted) {
+        setLoading(false);
       }
     }
 
@@ -61,7 +74,7 @@ export default function DashboardPage() {
     return () => {
       aborted = true;
     };
-  }, []);
+  }, [adminContext]);
 
   async function checkPermissions() {
     const hasPermission = await checkPermission("agent");
@@ -138,12 +151,15 @@ export default function DashboardPage() {
     }
   }
 
-  if (!hasAccess) {
+  if (!loading && hasAccess === false) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600 mt-2">
-          You don&apos;t have permission to view the dashboard.
+      <div className="text-center py-16 bg-white rounded-2xl border border-red-100 shadow-sm max-w-lg mx-auto mt-12 p-8">
+        <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-500">
+          <AlertTriangle size={32} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Access Restricted</h2>
+        <p className="text-gray-500 mt-2 text-sm">
+          You don&apos;t have administrative permissions to view the main dashboard metrics.
         </p>
       </div>
     );
@@ -151,11 +167,33 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <Loader2
-          size={48}
-          className="animate-spin mx-auto text-radiance-goldColor"
-        />
+      <div className="space-y-6 animate-pulse">
+        <div>
+          <div className="h-8 w-48 bg-gray-200 rounded-lg mb-2" />
+          <div className="h-4 w-72 bg-gray-100 rounded-md" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl p-6 border border-gray-100 h-32 flex flex-col justify-between">
+              <div className="h-10 w-10 bg-gray-100 rounded-xl" />
+              <div>
+                <div className="h-6 w-24 bg-gray-200 rounded mb-1" />
+                <div className="h-3 w-32 bg-gray-100 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-xl p-6 border border-gray-100 h-28 flex items-center gap-4">
+              <div className="h-14 w-14 bg-gray-100 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <div className="h-6 w-16 bg-gray-200 rounded" />
+                <div className="h-4 w-32 bg-gray-100 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

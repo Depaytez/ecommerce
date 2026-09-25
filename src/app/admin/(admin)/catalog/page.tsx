@@ -34,10 +34,12 @@ import {
   FileVideo,
   Loader2,
   DollarSign,
+  AlertTriangle,
 } from "lucide-react";
 import type { Product } from "@/types";
 import { useToast } from "@/context/ToastContext";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import { useAdmin } from "@/context/AdminContext";
 
 // Category options with icons and colors
 const CATEGORY_OPTIONS = [
@@ -85,8 +87,11 @@ const CATEGORY_OPTIONS = [
 ];
 
 export default function ProductsCatalogPage() {
+  const adminContext = useAdmin();
   const { success, error: showError } = useToast();
-  const [hasAccess, setHasAccess] = useState(false);
+  const [hasAccess, setHasAccess] = useState<boolean>(() => {
+    return adminContext ? adminContext.isAgent : true;
+  });
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -116,9 +121,13 @@ export default function ProductsCatalogPage() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    checkPermissions();
+    if (adminContext) {
+      setHasAccess(adminContext.isAgent);
+    } else {
+      checkPermissions();
+    }
     loadProducts();
-  }, []);
+  }, [adminContext]);
 
   async function checkPermissions() {
     const hasPermission = await checkPermission("agent");
@@ -374,13 +383,34 @@ export default function ProductsCatalogPage() {
     setUploadedImages((prev) => prev.filter((img) => img !== url));
   }
 
-  if (!hasAccess) {
+  if (!loading && hasAccess === false) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600 mt-2">
-          You don&apos;t have permission to manage products.
+      <div className="text-center py-16 bg-white rounded-2xl border border-red-100 shadow-sm max-w-lg mx-auto mt-12 p-8">
+        <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-500">
+          <AlertTriangle size={32} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Access Restricted</h2>
+        <p className="text-gray-500 mt-2 text-sm">
+          You don&apos;t have administrative permissions to view or manage the product catalog.
         </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded-lg mb-2" />
+            <div className="h-4 w-72 bg-gray-100 rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="h-72 bg-white rounded-2xl border border-gray-100 p-4" />
+          ))}
+        </div>
       </div>
     );
   }
