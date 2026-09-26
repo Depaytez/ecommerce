@@ -51,12 +51,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value:
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.supabase.co https://*.fingerprintjs.com https://*.fpcdn.io https://*.datadoghq.com https://va.vercel-scripts.com; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://js.paystack.co https://*.supabase.co https://*.fingerprintjs.com https://*.fpcdn.io https://*.datadoghq.com https://va.vercel-scripts.com; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-              "img-src 'self' data: blob: https://jradianceco.com https://www.jradianceco.com https://*.supabase.co https://*.vercel.com https://*.stripe.com; " +
-              "connect-src 'self' https://*.supabase.co https://*.datadoghq.com https://api.stripe.com https://*.stripe.com https://*.vercel-analytics.com; " +
-              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com;",
+              "img-src 'self' data: blob: https://jradianceco.com https://www.jradianceco.com https://*.supabase.co https://*.vercel.com https://*.stripe.com https://*.paystack.co; " +
+              "connect-src 'self' https://*.supabase.co https://*.datadoghq.com https://api.stripe.com https://*.stripe.com https://api.paystack.co https://*.vercel-analytics.com; " +
+              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.paystack.com https://standard.paystack.co;",
           },
           // Additional security headers
           {
