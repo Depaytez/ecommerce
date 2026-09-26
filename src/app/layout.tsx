@@ -63,8 +63,8 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en">
-      <body className={bodyClasses}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={bodyClasses} suppressHydrationWarning>
         <Script
           id="organization-schema"
           type="application/ld+json"

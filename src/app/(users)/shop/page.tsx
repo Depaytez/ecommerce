@@ -32,10 +32,10 @@ import ProductCard from "@/components/products/ProductCard";
 import { useToast } from "@/context/ToastContext";
 
 interface ShopPageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default function ShopPage({ searchParams }: ShopPageProps) {
+export default function ShopPage({ searchParams: _searchParams }: ShopPageProps) {
   const { success, error: showError } = useToast();
 
   // State
@@ -143,7 +143,7 @@ export default function ShopPage({ searchParams }: ShopPageProps) {
 
   // Sort products
   const sortedProducts = useMemo(() => {
-    let sorted = [...products];
+    const sorted = [...products];
 
     switch (sortBy) {
       case "price-low":

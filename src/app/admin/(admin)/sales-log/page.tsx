@@ -9,10 +9,14 @@
 
 import { useState, useEffect } from "react";
 import { getSalesStats, checkPermission } from "../admin-actions";
-import { DollarSign, ShoppingCart, CheckCircle, TrendingUp } from "lucide-react";
+import { DollarSign, ShoppingCart, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { useAdmin } from "@/context/AdminContext";
 
 export default function SalesLogPage() {
-  const [hasAccess, setHasAccess] = useState(false);
+  const adminContext = useAdmin();
+  const [hasAccess, setHasAccess] = useState<boolean>(() => {
+    return adminContext ? adminContext.isAdmin : true;
+  });
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     totalRevenue: number;
@@ -23,9 +27,13 @@ export default function SalesLogPage() {
   const [period, setPeriod] = useState<"day" | "week" | "month" | "all">("all");
 
   useEffect(() => {
-    checkPermissions();
+    if (adminContext) {
+      setHasAccess(adminContext.isAdmin);
+    } else {
+      checkPermissions();
+    }
     loadStats();
-  }, [period]);
+  }, [period, adminContext]);
 
   async function checkPermissions() {
     const hasPermission = await checkPermission("admin");
@@ -41,11 +49,32 @@ export default function SalesLogPage() {
     setLoading(false);
   }
 
-  if (!hasAccess) {
+  if (!loading && hasAccess === false) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
-        <p className="text-gray-600 mt-2">You don't have permission to view sales logs.</p>
+      <div className="text-center py-16 bg-white rounded-2xl border border-red-100 shadow-sm max-w-lg mx-auto mt-12 p-8">
+        <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-500">
+          <AlertTriangle size={32} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Access Restricted</h2>
+        <p className="text-gray-500 mt-2 text-sm">You don&apos;t have administrative permissions to view sales logs.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded-lg mb-2" />
+            <div className="h-4 w-72 bg-gray-100 rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-28 bg-white rounded-xl border border-gray-100 p-6" />
+          ))}
+        </div>
       </div>
     );
   }
