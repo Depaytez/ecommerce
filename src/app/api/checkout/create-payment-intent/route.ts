@@ -149,8 +149,19 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Create Payment Intent API Error]:', error);
+    let errorMessage = error.message || 'Internal server error processing checkout';
+
+    if (
+      errorMessage.includes('Invalid API Key') ||
+      errorMessage.includes('sk_test_placeholder') ||
+      errorMessage.includes('api_key')
+    ) {
+      errorMessage =
+        'Stripe Configuration Required: The STRIPE_SECRET_KEY in your .env.local is invalid or a placeholder. Please configure a valid test key (sk_test_...) from dashboard.stripe.com/test/apikeys to enable card payments.';
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Internal server error processing checkout' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

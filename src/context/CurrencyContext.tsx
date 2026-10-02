@@ -14,12 +14,14 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { detectUserCurrency, formatCurrency, getPriceInCurrency, type CurrencyCode } from "@/utils/currency";
+import { createClient } from "@/utils/supabase/client";
 
 interface CurrencyContextType {
   currency: CurrencyCode;
+  exchangeRate: number;
   setCurrency: (currency: CurrencyCode) => void;
-  formatPrice: (ngnPrice: number, usdPrice?: number | null, exchangeRate?: number) => string;
-  getPrice: (ngnPrice: number, usdPrice?: number | null, exchangeRate?: number) => number;
+  formatPrice: (ngnPrice: number, usdPrice?: number | null, rateOverride?: number) => string;
+  getPrice: (ngnPrice: number, usdPrice?: number | null, rateOverride?: number) => number;
   toggleCurrency: () => void;
 }
 
@@ -27,9 +29,10 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyCode>("NGN");
+  const [exchangeRate, setExchangeRate] = useState<number>(0.00065);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load currency preference on mount
+  // Load currency preference and exchange rates on mount
   useEffect(() => {
     try {
       // Check localStorage first
@@ -46,6 +49,27 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       console.error("Error loading currency preference:", error);
       setCurrencyState("NGN");
     }
+
+    // Dynamically fetch live exchange rate from database
+    async function loadExchangeRate() {
+      try {
+        const supabase = createClient();
+        const { data: rateData } = await supabase
+          .from("exchange_rates")
+          .select("rate")
+          .eq("base_currency", "NGN")
+          .eq("target_currency", "USD")
+          .maybeSingle();
+
+        if (rateData?.rate) {
+          setExchangeRate(Number(rateData.rate));
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic exchange rates, using fallback:", err);
+      }
+    }
+
+    loadExchangeRate();
     setIsLoaded(true);
   }, []);
 
@@ -70,28 +94,31 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const formatPrice = useCallback((
     ngnPrice: number,
     usdPrice?: number | null,
-    exchangeRate?: number
+    rateOverride?: number
   ): string => {
-    const price = getPriceInCurrency(ngnPrice, usdPrice || null, currency, exchangeRate);
+    const effectiveRate = rateOverride || exchangeRate;
+    const price = getPriceInCurrency(ngnPrice, usdPrice || null, currency, effectiveRate);
     return formatCurrency(price, currency);
-  }, [currency]);
+  }, [currency, exchangeRate]);
 
   // Get numeric price based on selected currency
   const getPrice = useCallback((
     ngnPrice: number,
     usdPrice?: number | null,
-    exchangeRate?: number
+    rateOverride?: number
   ): number => {
-    return getPriceInCurrency(ngnPrice, usdPrice || null, currency, exchangeRate);
-  }, [currency]);
+    const effectiveRate = rateOverride || exchangeRate;
+    return getPriceInCurrency(ngnPrice, usdPrice || null, currency, effectiveRate);
+  }, [currency, exchangeRate]);
 
   const value = useMemo(() => ({
     currency,
+    exchangeRate,
     setCurrency,
     formatPrice,
     getPrice,
     toggleCurrency,
-  }), [currency, setCurrency, formatPrice, getPrice, toggleCurrency]);
+  }), [currency, exchangeRate, setCurrency, formatPrice, getPrice, toggleCurrency]);
 
 
   return (
