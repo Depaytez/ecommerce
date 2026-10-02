@@ -94,7 +94,6 @@ function ProductDetailContent({
 
   const usdPrice = (product as { usd_price?: number | null }).usd_price || null;
   const usdDiscountPrice = (product as { usd_discount_price?: number | null }).usd_discount_price || null;
-  const exchangeRate = (product as { exchange_rate?: number }).exchange_rate || 0.00065;
 
   // Track wishlist state
   useEffect(() => {
@@ -393,11 +392,11 @@ function ProductDetailContent({
             <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm space-y-1">
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-radiance-charcoalTextColor">
-                  {formatPrice(displayPrice, usdDiscountPrice || usdPrice, exchangeRate)}
+                  {formatPrice(displayPrice, usdDiscountPrice || usdPrice)}
                 </span>
                 {hasDiscount && (
                   <span className="text-lg text-gray-400 line-through">
-                    {formatPrice(product.price, usdPrice, exchangeRate)}
+                    {formatPrice(product.price, usdPrice)}
                   </span>
                 )}
               </div>
@@ -646,7 +645,7 @@ function ProductDetailContent({
             <div className="min-w-0">
               <p className="font-semibold text-xs text-gray-900 truncate">{product.name}</p>
               <p className="font-bold text-sm text-radiance-goldColor">
-                {formatPrice(displayPrice, usdDiscountPrice || usdPrice, exchangeRate)}
+                {formatPrice(displayPrice, usdDiscountPrice || usdPrice)}
               </p>
             </div>
           </div>

@@ -104,7 +104,6 @@ function ProductCard({
 
   const usdPrice = (product as { usd_price?: number | null }).usd_price || null;
   const usdDiscountPrice = (product as { usd_discount_price?: number | null }).usd_discount_price || null;
-  const exchangeRate = (product as { exchange_rate?: number }).exchange_rate || 0.00065;
 
   const hasVideo =
     product.attributes?.videos &&
@@ -324,11 +323,11 @@ function ProductCard({
           {/* Pricing Display */}
           <div className="flex items-baseline gap-2 pt-1 border-t border-gray-100">
             <span className="text-base font-bold text-radiance-charcoalTextColor">
-              {formatPrice(displayPrice, usdDiscountPrice || usdPrice, exchangeRate)}
+              {formatPrice(displayPrice, usdDiscountPrice || usdPrice)}
             </span>
             {hasDiscount && (
               <span className="text-xs text-gray-400 line-through">
-                {formatPrice(product.price, usdPrice, exchangeRate)}
+                {formatPrice(product.price, usdPrice)}
               </span>
             )}
           </div>
@@ -454,11 +453,11 @@ function ProductCard({
 
         <div className="flex items-baseline gap-2">
           <span className="text-sm font-bold text-radiance-charcoalTextColor">
-            {formatPrice(displayPrice, usdDiscountPrice || usdPrice, exchangeRate)}
+            {formatPrice(displayPrice, usdDiscountPrice || usdPrice)}
           </span>
           {hasDiscount && (
             <span className="text-xs text-gray-400 line-through">
-              {formatPrice(product.price, usdPrice, exchangeRate)}
+              {formatPrice(product.price, usdPrice)}
             </span>
           )}
         </div>

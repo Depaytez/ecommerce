@@ -77,4 +77,87 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_...
 PAYSTACK_SECRET_KEY=sk_test_...
 PAYSTACK_WEBHOOK_SECRET=whsec_...
+
+# Scheduled Stock Reservation Cron
+CRON_SECRET=your_secure_cron_token_here
 ```
+
+---
+
+## 6. Webhook Setup & Pointing Guide (Engineer Instructions)
+
+For orders to complete asynchronously and reserve stock permanently, webhooks **must** be pointed to the application.
+
+### A. Local Development
+
+#### 1. Stripe Webhook Local Forwarding
+Use the official Stripe CLI to forward events directly to your local Next.js server:
+```bash
+# 1. Login to your Stripe account
+stripe login
+
+# 2. Forward events to local webhook endpoint
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+
+# 3. Copy the printed webhook signing secret (starts with whsec_...) and paste into .env.local:
+# STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+#### 2. Paystack Webhook Local Forwarding
+Because Paystack requires a public URL for webhooks, use `ngrok` or `localtunnel`:
+```bash
+# Start ngrok tunnel to your local Next.js server
+ngrok http 3000
+
+# Copy the HTTPS forwarding URL (e.g., https://abc123.ngrok-free.app)
+# Go to Paystack Dashboard -> Settings -> Preferences -> Webhooks:
+# Live / Test Webhook URL: https://abc123.ngrok-free.app/api/webhooks/paystack
+# Ensure Secret Key on dashboard matches PAYSTACK_SECRET_KEY in .env.local
+```
+
+### B. Production Deployment (Vercel / Custom Server)
+
+#### 1. Stripe Dashboard Configuration
+1. Go to [Stripe Dashboard > Developers > Webhooks](https://dashboard.stripe.com/webhooks).
+2. Click **Add destination** / **Add an endpoint**.
+3. **Endpoint URL**: `https://<YOUR_DOMAIN>/api/webhooks/stripe` (e.g., `https://jradianceco.com/api/webhooks/stripe`).
+4. **Events to listen to**:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `payment_intent.canceled`
+   - `charge.refunded`
+5. Reveal **Signing secret** (`whsec_...`) and configure as `STRIPE_WEBHOOK_SECRET` in your production environment variables.
+
+#### 2. Paystack Dashboard Configuration
+1. Go to [Paystack Dashboard > Settings > API Keys & Webhooks](https://dashboard.paystack.com/#/settings/developer).
+2. In the **Live Webhook URL** field, set:
+   `https://<YOUR_DOMAIN>/api/webhooks/paystack` (e.g., `https://jradianceco.com/api/webhooks/paystack`).
+3. Paystack signs all webhooks using your `PAYSTACK_SECRET_KEY`. Ensure `PAYSTACK_SECRET_KEY` matches the secret key in your production environment variables.
+
+---
+
+## 7. Automated Expired Inventory Cleanup (Cron Setup)
+
+When customers abandon checkout sessions without completing payment, stock is temporarily held for 15 minutes. To release expired stock back into available inventory:
+
+### A. Vercel Cron Configuration (`vercel.json`)
+Add a scheduled job to `vercel.json`:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/release-expired-reservations",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+```
+Vercel automatically sends `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is set in Vercel project environment variables.
+
+### B. Supabase / External Webhook Invocation
+Alternatively, call the endpoint every 10-15 minutes using GitHub Actions, Supabase `pg_cron`, or Cloudflare Workers:
+```bash
+curl -X POST https://jradianceco.com/api/cron/release-expired-reservations \
+  -H "Authorization: Bearer <CRON_SECRET>"
+```
+

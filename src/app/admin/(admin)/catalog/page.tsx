@@ -310,7 +310,7 @@ export default function ProductsCatalogPage() {
           : null,
         exchange_rate: formData.exchange_rate
           ? parseFloat(formData.exchange_rate)
-          : 1.0,
+          : undefined,
       };
 
       let result;
@@ -720,15 +720,23 @@ export default function ProductsCatalogPage() {
               </div>
 
               {/* Multi-Currency Pricing Section */}
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
-                  <DollarSign size={16} />
-                  International Pricing (USD)
-                </h3>
+              <div className="mt-6 p-4 bg-blue-50/80 border border-blue-200 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-blue-950 flex items-center gap-2">
+                    <DollarSign size={16} className="text-blue-600" />
+                    International Pricing (USD) - Automated
+                  </h3>
+                  <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">
+                    Auto-converted by default
+                  </span>
+                </div>
+                <p className="text-xs text-blue-800/80 mb-3 leading-relaxed">
+                  Admins do <strong>not</strong> need to manually define prices in USD. The storefront and checkout automatically convert your Naira (₦) price to USD using live exchange rates. Only specify values below if you want a fixed custom USD price override.
+                </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price ($)
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      USD Price ($) <span className="text-gray-400 font-normal">(Optional Override)</span>
                     </label>
                     <input
                       type="number"
@@ -738,14 +746,14 @@ export default function ProductsCatalogPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, usd_price: e.target.value })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radiance-goldColor focus:border-transparent"
-                      placeholder="Enter USD price"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radiance-goldColor focus:border-transparent text-sm"
+                      placeholder="Auto (live converted from ₦)"
                       disabled={uploading || actionLoading === "submit"}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Discount Price ($)
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      USD Discount Price ($) <span className="text-gray-400 font-normal">(Optional Override)</span>
                     </label>
                     <input
                       type="number"
@@ -758,16 +766,12 @@ export default function ProductsCatalogPage() {
                           usd_discount_price: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radiance-goldColor focus:border-transparent"
-                      placeholder="Enter USD discount"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radiance-goldColor focus:border-transparent text-sm"
+                      placeholder="Auto (live converted from ₦)"
                       disabled={uploading || actionLoading === "submit"}
                     />
                   </div>
                 </div>
-                <p className="text-xs text-blue-700 mt-2">
-                  💡 Set USD prices manually for full control, or use the
-                  exchange rate for auto-conversion
-                </p>
               </div>
 
               {/* Media Upload Section */}

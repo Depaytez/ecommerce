@@ -94,7 +94,7 @@ export default function CartOverlay({
             </div>
             {!isFreeShipping && (
               <p className="text-[10px] text-amber-700/80 mt-1">
-                Add ₦{(50000 - subtotal).toLocaleString()} more for free shipping
+                Add {formatPrice(Math.max(0, 50000 - subtotal))} more for free shipping
               </p>
             )}
           </div>
