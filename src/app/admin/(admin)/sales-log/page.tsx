@@ -8,15 +8,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSalesStats, checkPermission } from "../admin-actions";
+import { getSalesStats } from "../admin-actions";
 import { DollarSign, ShoppingCart, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 export default function SalesLogPage() {
   const adminContext = useAdmin();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.isAdmin : true;
-  });
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     totalRevenue: number;
@@ -26,19 +23,17 @@ export default function SalesLogPage() {
   } | null>(null);
   const [period, setPeriod] = useState<"day" | "week" | "month" | "all">("all");
 
-  useEffect(() => {
-    if (adminContext) {
-      setHasAccess(adminContext.isAdmin);
-    } else {
-      checkPermissions();
-    }
-    loadStats();
-  }, [period, adminContext]);
+  const hasAccess = adminContext ? adminContext.isAdmin : false;
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("admin");
-    setHasAccess(hasPermission);
-  }
+  useEffect(() => {
+    if (!adminContext) return;
+
+    if (adminContext.isAdmin) {
+      loadStats();
+    } else {
+      setLoading(false);
+    }
+  }, [period, adminContext]);
 
   async function loadStats() {
     setLoading(true);

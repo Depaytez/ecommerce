@@ -19,7 +19,6 @@ import {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
-  checkPermission,
   uploadProductMedia,
 } from "../admin-actions";
 import {
@@ -89,9 +88,6 @@ const CATEGORY_OPTIONS = [
 export default function ProductsCatalogPage() {
   const adminContext = useAdmin();
   const { success, error: showError } = useToast();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.isAgent : true;
-  });
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -120,19 +116,17 @@ export default function ProductsCatalogPage() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    if (adminContext) {
-      setHasAccess(adminContext.isAgent);
-    } else {
-      checkPermissions();
-    }
-    loadProducts();
-  }, [adminContext]);
+  const hasAccess = adminContext ? adminContext.isAgent : false;
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("agent");
-    setHasAccess(hasPermission);
-  }
+  useEffect(() => {
+    if (!adminContext) return;
+
+    if (adminContext.isAgent) {
+      loadProducts();
+    } else {
+      setLoading(false);
+    }
+  }, [adminContext]);
 
   async function loadProducts() {
     setLoading(true);

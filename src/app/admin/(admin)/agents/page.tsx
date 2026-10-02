@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAllAgents, promoteUser, demoteUser, checkPermission } from "../admin-actions";
+import { getAllAgents, promoteUser, demoteUser } from "../admin-actions";
 import { User, Shield, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
@@ -27,25 +27,20 @@ export default function AgentsManagerPage() {
   const adminContext = useAdmin();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isChiefAdmin, setIsChiefAdmin] = useState<boolean>(() => {
-    return adminContext ? adminContext.isChiefAdmin : false;
-  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const isChiefAdmin = adminContext ? adminContext.isChiefAdmin : false;
+
   useEffect(() => {
-    loadAgents();
-    if (adminContext) {
-      setIsChiefAdmin(adminContext.isChiefAdmin);
+    if (!adminContext) return;
+
+    if (adminContext.isChiefAdmin) {
+      loadAgents();
     } else {
-      checkPermissions();
+      setLoading(false);
     }
   }, [adminContext]);
-
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("chief_admin");
-    setIsChiefAdmin(hasPermission);
-  }
 
   async function loadAgents() {
     setLoading(true);

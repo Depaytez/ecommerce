@@ -14,7 +14,6 @@ import {
   updateIssuePriority,
   deleteIssue,
   clearResolvedIssues,
-  checkPermission
 } from "../issue-actions";
 import { AlertTriangle, Bug, MessageSquare, CheckCircle, Clock, AlertCircle, Plus, Trash2, RotateCcw, Shield } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
@@ -36,9 +35,7 @@ interface Issue {
 
 export default function IssuesLogPage() {
   const adminContext = useAdmin();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.isAdmin : true;
-  });
+  const hasAccess = adminContext ? adminContext.isAdmin : false;
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "bug" | "complaint" | "feature_request">("all");
@@ -49,18 +46,14 @@ export default function IssuesLogPage() {
   const [clearingResolved, setClearingResolved] = useState(false);
 
   useEffect(() => {
-    if (adminContext) {
-      setHasAccess(adminContext.isAdmin);
-    } else {
-      checkPermissions();
-    }
-    loadIssues();
-  }, [adminContext]);
+    if (!adminContext) return;
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("admin");
-    setHasAccess(hasPermission);
-  }
+    if (adminContext.isAdmin) {
+      loadIssues();
+    } else {
+      setLoading(false);
+    }
+  }, [adminContext]);
 
   async function loadIssues() {
     setLoading(true);

@@ -1,8 +1,7 @@
 /**
- * Admin Layout
+ * Admin Root Layout
  * 
- * Applies consistent padding and centering to all admin pages
- * ensuring the dashboard remains readable and centered.
+ * Provides full-bleed layout container for admin routes.
  */
 
 export default function AdminLayout({
@@ -11,7 +10,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="min-h-screen bg-radiance-creamBackgroundColor">
       {children}
     </div>
   );

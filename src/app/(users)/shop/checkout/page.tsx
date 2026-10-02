@@ -1,9 +1,9 @@
 /**
  * Checkout Page
  *
- * Enterprise Checkout flow powered by:
+ * Enterprise Dual-Gateway Checkout flow powered by:
  * - Server-verified quotes & atomic stock reservation
- * - Stripe Elements payment gateway (Payment Intents API)
+ * - Dual Gateway: Stripe (International Cards/Apple Pay) + Paystack (Naira Cards/Transfer/USSD)
  * - Domain-Driven Design (DDD) compliance
  *
  * Access: Authenticated users only
@@ -17,29 +17,46 @@ import Image from "next/image";
 import { Elements } from "@stripe/react-stripe-js";
 import { useUser } from "@/context/UserContext";
 import { useCart } from "@/context/CartContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { getStripe } from "@/lib/stripe-client";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import {
   ShieldCheck,
   Truck,
   MapPin,
-  Phone,
-  User as UserIcon,
   ShoppingBag,
   ArrowRight,
   Edit2,
   AlertCircle,
   Loader2,
   Lock,
+  CreditCard,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import type { CheckoutQuote } from "@/domains/checkout/types";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const user = useUser();
-  const { cart, subtotal, tax, shipping, totalPrice, isFreeShipping, isLoading: cartLoading, clearCart, refreshCart } = useCart();
+  const { currency } = useCurrency();
+  const {
+    cart,
+    subtotal,
+    tax,
+    shipping,
+    totalPrice,
+    isFreeShipping,
+    isLoading: cartLoading,
+    clearCart,
+    refreshCart,
+  } = useCart();
 
   const [step, setStep] = useState<"delivery" | "payment">("delivery");
+  const [selectedGateway, setSelectedGateway] = useState<"paystack" | "stripe">(() => {
+    return currency === "USD" ? "stripe" : "paystack";
+  });
+
   const [isInitializingPayment, setIsInitializingPayment] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -71,7 +88,14 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
-  // Handle proceeding from delivery form to Stripe payment
+  // Adjust default gateway when currency changes
+  useEffect(() => {
+    if (currency === "USD") {
+      setSelectedGateway("stripe");
+    }
+  }, [currency]);
+
+  // Handle proceeding from delivery form to chosen payment gateway
   const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setInitError(null);
@@ -94,36 +118,72 @@ export default function CheckoutPage() {
     setIsInitializingPayment(true);
 
     try {
-      const response = await fetch("/api/checkout/create-payment-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((item) => ({
-            productId: item.product_id,
-            quantity: item.quantity,
-          })),
-          customer: {
-            fullName: formData.full_name,
-            email: formData.email,
-            phone: formData.phone,
-            shippingAddress: formData.shipping_address,
-            billingAddress: formData.same_as_shipping ? formData.shipping_address : formData.billing_address,
-          },
-          currency: "NGN",
-        }),
-      });
+      if (selectedGateway === "paystack") {
+        // Paystack Initialization Flow
+        const response = await fetch("/api/checkout/paystack/initialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cart.map((item) => ({
+              productId: item.product_id,
+              quantity: item.quantity,
+            })),
+            customer: {
+              fullName: formData.full_name,
+              email: formData.email,
+              phone: formData.phone,
+              shippingAddress: formData.shipping_address,
+              billingAddress: formData.same_as_shipping ? formData.shipping_address : formData.billing_address,
+            },
+          }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to initialize payment session.");
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to initialize Paystack payment session.");
+        }
+
+        if (data.authorizationUrl) {
+          // Redirect to Paystack secure checkout portal
+          window.location.href = data.authorizationUrl;
+          return;
+        } else {
+          throw new Error("Paystack did not return a valid authorization URL.");
+        }
+      } else {
+        // Stripe Elements Flow
+        const response = await fetch("/api/checkout/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cart.map((item) => ({
+              productId: item.product_id,
+              quantity: item.quantity,
+            })),
+            customer: {
+              fullName: formData.full_name,
+              email: formData.email,
+              phone: formData.phone,
+              shippingAddress: formData.shipping_address,
+              billingAddress: formData.same_as_shipping ? formData.shipping_address : formData.billing_address,
+            },
+            currency: currency === "USD" ? "USD" : "NGN",
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to initialize Stripe payment session.");
+        }
+
+        setClientSecret(data.clientSecret);
+        setOrderId(data.orderId);
+        setOrderNumber(data.orderNumber);
+        setServerQuote(data.quote);
+        setStep("payment");
       }
-
-      setClientSecret(data.clientSecret);
-      setOrderId(data.orderId);
-      setOrderNumber(data.orderNumber);
-      setServerQuote(data.quote);
-      setStep("payment");
     } catch (err: any) {
       console.error("[Checkout Init Error]:", err);
       setInitError(err.message || "An error occurred while preparing your checkout session.");
@@ -163,7 +223,14 @@ export default function CheckoutPage() {
     );
   }
 
-  const effectiveQuote = serverQuote || {
+  const effectiveQuote: CheckoutQuote = serverQuote || {
+    items: cart.map((i) => ({
+      productId: i.product_id,
+      name: i.product?.name || "Product",
+      quantity: i.quantity,
+      unitPrice: i.product?.discount_price || i.product?.price || 0,
+      subtotal: (i.product?.discount_price || i.product?.price || 0) * i.quantity,
+    })),
     subtotal,
     tax,
     shipping,
@@ -188,7 +255,7 @@ export default function CheckoutPage() {
             <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs">
               1
             </span>
-            Delivery Info
+            Delivery & Payment Choice
           </span>
           <span className="text-gray-300">—</span>
           <span
@@ -199,7 +266,7 @@ export default function CheckoutPage() {
             <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs">
               2
             </span>
-            Payment (Stripe)
+            Payment Confirmation
           </span>
         </div>
       </div>
@@ -219,7 +286,7 @@ export default function CheckoutPage() {
               {/* Contact Information */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-4">
                 <div className="flex items-center gap-2.5 pb-3 border-b border-gray-100 text-radiance-charcoalTextColor font-bold text-lg">
-                  <UserIcon size={20} className="text-radiance-goldColor" />
+                  <CreditCard size={20} className="text-radiance-goldColor" />
                   <h2>Contact Information</h2>
                 </div>
 
@@ -257,16 +324,13 @@ export default function CheckoutPage() {
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     Phone Number
                   </label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute left-3.5 top-3.5 text-gray-400" />
-                    <input
-                      type="tel"
-                      placeholder="e.g. +234 801 234 5678"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-radiance-goldColor/40 text-sm transition"
-                    />
-                  </div>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +234 803 123 4567"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-radiance-goldColor/40 text-sm transition"
+                  />
                 </div>
               </div>
 
@@ -279,12 +343,12 @@ export default function CheckoutPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                    Complete Street Address *
+                    Delivery Address *
                   </label>
                   <textarea
                     rows={3}
                     required
-                    placeholder="House/Apartment number, street name, estate, city, state"
+                    placeholder="House/Apartment number, street name, city, state, postal code"
                     value={formData.shipping_address}
                     onChange={(e) =>
                       setFormData({ ...formData, shipping_address: e.target.value })
@@ -293,17 +357,18 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                <div className="pt-2">
-                  <label className="flex items-center gap-2.5 cursor-pointer text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={formData.same_as_shipping}
-                      onChange={(e) =>
-                        setFormData({ ...formData, same_as_shipping: e.target.checked })
-                      }
-                      className="w-4 h-4 text-radiance-goldColor rounded border-gray-300 focus:ring-radiance-goldColor"
-                    />
-                    <span>Billing address same as shipping address</span>
+                <div className="flex items-center gap-2.5 pt-2">
+                  <input
+                    type="checkbox"
+                    id="same_as_shipping"
+                    checked={formData.same_as_shipping}
+                    onChange={(e) =>
+                      setFormData({ ...formData, same_as_shipping: e.target.checked })
+                    }
+                    className="w-4 h-4 text-radiance-goldColor rounded border-gray-300 focus:ring-radiance-goldColor"
+                  />
+                  <label htmlFor="same_as_shipping" className="text-xs text-gray-600 font-medium cursor-pointer">
+                    Billing address matches delivery address
                   </label>
                 </div>
 
@@ -326,6 +391,81 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Dual Payment Gateway Selection */}
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2.5 text-radiance-charcoalTextColor font-bold text-lg">
+                    <CreditCard size={20} className="text-radiance-goldColor" />
+                    <h2>Select Payment Method</h2>
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">
+                    256-Bit SSL Encrypted
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  {/* Option 1: Paystack */}
+                  <div
+                    onClick={() => setSelectedGateway("paystack")}
+                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      selectedGateway === "paystack"
+                        ? "border-radiance-goldColor bg-amber-50/20 shadow-xs"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                          Paystack
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
+                            NGN Instant
+                          </span>
+                        </span>
+                        {selectedGateway === "paystack" && (
+                          <CheckCircle2 size={18} className="text-radiance-goldColor" />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-3">
+                        Ideal for Nigerian Naira cards, Bank Transfers, USSD, and Mobile Money.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400">
+                      <span>Debit Card</span> • <span>Bank Transfer</span> • <span>USSD</span>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Stripe */}
+                  <div
+                    onClick={() => setSelectedGateway("stripe")}
+                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      selectedGateway === "stripe"
+                        ? "border-radiance-goldColor bg-amber-50/20 shadow-xs"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                          Stripe
+                          <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded-full">
+                            Global
+                          </span>
+                        </span>
+                        {selectedGateway === "stripe" && (
+                          <CheckCircle2 size={18} className="text-radiance-goldColor" />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-3">
+                        International credit/debit cards, Apple Pay, Google Pay, and global currencies.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400">
+                      <span>Visa</span> • <span>Mastercard</span> • <span>Apple Pay</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Submit CTA */}
               <button
                 type="submit"
@@ -335,11 +475,15 @@ export default function CheckoutPage() {
                 {isInitializingPayment ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
-                    <span>Preparing Payment Intent...</span>
+                    <span>Preparing {selectedGateway === "paystack" ? "Paystack" : "Stripe"} Session...</span>
                   </>
                 ) : (
                   <>
-                    <span>Proceed to Payment</span>
+                    <span>
+                      {selectedGateway === "paystack"
+                        ? `Pay with Paystack (₦${effectiveQuote.total.toLocaleString()})`
+                        : "Proceed to Card Payment (Stripe)"}
+                    </span>
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -454,9 +598,9 @@ export default function CheckoutPage() {
               })}
             </div>
 
-            {/* Free Shipping Indicator */}
-            {effectiveQuote.subtotal > 0 && !effectiveQuote.isFreeShipping && (
-              <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs text-amber-800 flex items-center gap-2">
+            {/* Free Shipping Progress */}
+            {!isFreeShipping && (
+              <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/50 flex items-center gap-2.5 text-xs text-amber-800">
                 <Truck size={16} className="text-amber-600 shrink-0" />
                 <span>
                   Add <strong>₦{(50000 - effectiveQuote.subtotal).toLocaleString()}</strong> more to qualify for <strong>Free Delivery</strong>!
@@ -500,7 +644,7 @@ export default function CheckoutPage() {
               </span>
               <span className="flex items-center gap-1">
                 <Lock size={14} className="text-radiance-goldColor" />
-                Stripe Payments
+                Stripe & Paystack
               </span>
             </div>
           </div>

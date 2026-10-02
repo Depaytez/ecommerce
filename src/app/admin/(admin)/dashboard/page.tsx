@@ -14,7 +14,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { checkPermission } from "../admin-actions";
 import {
   Package,
   ShoppingCart,
@@ -33,9 +32,7 @@ import { useAdmin } from "@/context/AdminContext";
 
 export default function DashboardPage() {
   const adminContext = useAdmin();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.canAccess("agent") : true;
-  });
+  const hasAccess = adminContext ? adminContext.canAccess("agent") : false;
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -51,35 +48,18 @@ export default function DashboardPage() {
   useEffect(() => {
     let aborted = false;
 
-    async function loadData() {
-      // If adminContext is available, role is pre-verified on server
-      let permitted = true;
-      if (adminContext) {
-        permitted = adminContext.canAccess("agent");
-      } else {
-        permitted = await checkPermission("agent");
-      }
+    if (!adminContext) return;
 
-      if (!aborted) setHasAccess(permitted);
-
-      if (permitted && !aborted) {
-        await loadDashboardData(aborted);
-      } else if (!aborted) {
-        setLoading(false);
-      }
+    if (adminContext.canAccess("agent")) {
+      loadDashboardData(aborted);
+    } else {
+      setLoading(false);
     }
-
-    loadData();
 
     return () => {
       aborted = true;
     };
   }, [adminContext]);
-
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("agent");
-    setHasAccess(hasPermission);
-  }
 
   async function loadDashboardData(aborted: boolean) {
     setLoading(true);

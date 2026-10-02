@@ -14,7 +14,6 @@ import {
   updateOrderStatus,
   cancelOrder,
   deleteOrder,
-  checkPermission,
   getOrderStatistics,
 } from "../order-actions";
 import {
@@ -90,9 +89,7 @@ interface OrderStats {
 
 export default function OrdersManagerPage() {
   const adminContext = useAdmin();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.isAgent : true;
-  });
+  const hasAccess = adminContext ? adminContext.isAgent : false;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<OrderStats | null>(null);
@@ -123,33 +120,16 @@ export default function OrdersManagerPage() {
   const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
-    if (adminContext) {
-      setHasAccess(adminContext.isAgent);
-      setUserRole(adminContext.admin.role);
-    } else {
-      checkPermissions();
-    }
-    loadOrders();
-    loadStats();
-  }, [adminContext]);
+    if (!adminContext) return;
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("agent");
-    setHasAccess(hasPermission);
-    
-    // Get user role for delete permission check
-    const { createClient } = await import("@/utils/supabase/client");
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      setUserRole(profile?.role || "");
+    if (adminContext.isAgent) {
+      setUserRole(adminContext.admin.role);
+      loadOrders();
+      loadStats();
+    } else {
+      setLoading(false);
     }
-  }
+  }, [adminContext]);
 
   async function loadOrders() {
     setLoading(true);

@@ -19,7 +19,6 @@ import {
   demoteUser,
   deleteUser,
   toggleUserStatus,
-  checkPermission,
 } from "../admin-actions";
 import { User, Shield, Trash2, ToggleLeft, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import Link from "next/link";
@@ -40,25 +39,20 @@ export default function UsersManagerPage() {
   const adminContext = useAdmin();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isChiefAdmin, setIsChiefAdmin] = useState<boolean>(() => {
-    return adminContext ? adminContext.isChiefAdmin : false;
-  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const isChiefAdmin = adminContext ? adminContext.isChiefAdmin : false;
+
   useEffect(() => {
-    loadUsers();
-    if (adminContext) {
-      setIsChiefAdmin(adminContext.isChiefAdmin);
+    if (!adminContext) return;
+
+    if (adminContext.isChiefAdmin) {
+      loadUsers();
     } else {
-      checkPermissions();
+      setLoading(false);
     }
   }, [adminContext]);
-
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("chief_admin");
-    setIsChiefAdmin(hasPermission);
-  }
 
   async function loadUsers() {
     setLoading(true);

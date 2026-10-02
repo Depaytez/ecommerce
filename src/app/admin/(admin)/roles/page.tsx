@@ -7,8 +7,6 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { checkPermission, getAdminPermissions } from "../admin-actions";
 import { Shield, Lock, Check, X, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
@@ -24,25 +22,8 @@ interface PermissionMatrix {
 
 export default function PermissionRolesPage() {
   const adminContext = useAdmin();
-  const [isChiefAdmin, setIsChiefAdmin] = useState<boolean>(() => {
-    return adminContext ? adminContext.isChiefAdmin : false;
-  });
-  const [loading, setLoading] = useState(!adminContext);
-
-  useEffect(() => {
-    if (adminContext) {
-      setIsChiefAdmin(adminContext.isChiefAdmin);
-      setLoading(false);
-      return;
-    }
-
-    async function check() {
-      const hasPermission = await checkPermission("chief_admin");
-      setIsChiefAdmin(hasPermission);
-      setLoading(false);
-    }
-    check();
-  }, [adminContext]);
+  const isChiefAdmin = adminContext ? adminContext.isChiefAdmin : false;
+  const loading = !adminContext;
 
   const permissionMatrix: PermissionMatrix[] = [
     {

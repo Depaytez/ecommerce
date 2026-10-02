@@ -8,31 +8,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getActivityLogs, checkPermission } from "../admin-actions";
+import { getActivityLogs } from "../admin-actions";
 import { ClipboardList, FileText, AlertTriangle } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 export default function AuditLogPage() {
   const adminContext = useAdmin();
-  const [hasAccess, setHasAccess] = useState<boolean>(() => {
-    return adminContext ? adminContext.isAdmin : true;
-  });
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (adminContext) {
-      setHasAccess(adminContext.isAdmin);
-    } else {
-      checkPermissions();
-    }
-    loadLogs();
-  }, [adminContext]);
+  const hasAccess = adminContext ? adminContext.isAdmin : false;
 
-  async function checkPermissions() {
-    const hasPermission = await checkPermission("admin");
-    setHasAccess(hasPermission);
-  }
+  useEffect(() => {
+    if (!adminContext) return;
+
+    if (adminContext.isAdmin) {
+      loadLogs();
+    } else {
+      setLoading(false);
+    }
+  }, [adminContext]);
 
   async function loadLogs() {
     setLoading(true);
